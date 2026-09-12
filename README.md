@@ -11,6 +11,7 @@ py -m venv .venv
 pip install -r requirements.txt
 python training\train_world_model.py
 python training\train_xgboost.py
+python training\benchmark_models.py
 uvicorn app.main:app --reload
 ```
 
@@ -41,3 +42,13 @@ Open `http://localhost:5173`, then upload a CIC-IDS style CSV or PCAP. Scapy rea
 4. Show the **Adaptive Threat Genome** panel: it anchors only a derived feature signature, demonstrating shareable threat intelligence without raw traffic disclosure.
 
 Run `docker compose up --build` for the optional container workflow.
+
+## Benchmarking
+
+Run `python training\benchmark_models.py` to write `models/benchmark_results.json`. The default result uses deterministic synthetic traffic and labels it clearly as such. For a reportable CIC-IDS-2018 or CTU-13 benchmark, export the normalized state matrix and binary labels as aligned `.npy` files, then run `python training\benchmark_models.py --states-npy states.npy --labels-npy labels.npy`. The script reports precision, recall, F1 score, and false-positive rate for a logistic-regression baseline and a temporal-context comparator.
+
+## Submission artifacts
+
+- `docs/architecture_document.docx`: two-page technical architecture summary.
+- `docs/sih_world_model_presentation.pptx`: five-slide presentation.
+- `docs/demo_video_script.md`: two-minute demonstration script.

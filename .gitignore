@@ -19,3 +19,7 @@ frontend/dist/
 .env.*
 .vscode/
 .idea/
+
+# Private artifact build and QA files
+.artifact-build/
+docs/docx_render/
