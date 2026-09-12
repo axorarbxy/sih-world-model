@@ -1,0 +1,1 @@
+export default function NetworkGraph(){return <section><h2>Network Topology</h2><div className="topology"><span>Traffic input</span><i>→</i><span className="alert">World Model</span><i>→</i><span>Forecast</span></div><p>Suspicious flows are highlighted after PCAP support is enriched with endpoint metadata.</p></section>}

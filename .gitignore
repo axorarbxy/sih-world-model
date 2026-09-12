@@ -1,0 +1,21 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.py[cod]
+
+# Runtime artifacts and uploaded traffic
+backend/predictions.db
+backend/data/uploads/
+backend/models/*.pt
+backend/models/*.json
+
+# JavaScript
+frontend/node_modules/
+frontend/dist/
+
+# Environment/editor files
+.env
+.env.*
+.vscode/
+.idea/

@@ -1,0 +1,1 @@
+import axios from 'axios'; export const uploadTraffic = file => { const form = new FormData(); form.append('file', file); return axios.post('http://localhost:8000/api/upload', form).then(r=>r.data) };

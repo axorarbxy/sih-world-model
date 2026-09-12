@@ -1,0 +1,1 @@
+import {useEffect,useState} from 'react'; export default function useWebSocket(){const [event,setEvent]=useState(); useEffect(()=>{const ws=new WebSocket('ws://localhost:8000/ws/stream');ws.onmessage=e=>setEvent(JSON.parse(e.data));return()=>ws.close()},[]);return event}
