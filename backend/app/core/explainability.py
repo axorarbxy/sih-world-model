@@ -15,7 +15,8 @@ def explain_forecast(history, forecast, attention, world_model=None):
     environments where SHAP cannot trace a particular PyTorch installation.
     """
     method = "attention-weighted state delta"
-    delta = np.abs(np.asarray(forecast) - np.asarray(history[-1]))
+    fallback_delta = np.abs(np.asarray(forecast) - np.asarray(history[-1]))
+    delta = fallback_delta.copy()
     if world_model is not None:
         try:
             import shap
@@ -25,8 +26,12 @@ def explain_forecast(history, forecast, attention, world_model=None):
             explainer = shap.GradientExplainer(_ForecastHead(world_model.model), background)
             values = explainer.shap_values(background)
             values = values[0] if isinstance(values, list) else values
-            delta = np.abs(np.asarray(values)).mean(axis=tuple(range(np.asarray(values).ndim - 1)))
-            method = "SHAP GradientExplainer"
+            shap_delta = np.abs(np.asarray(values)).mean(axis=tuple(range(np.asarray(values).ndim - 1)))
+            # An untrained/synthetic model can yield an all-zero SHAP tensor.
+            # Preserve a useful analyst view instead of drawing an empty chart.
+            if np.max(shap_delta) > 1e-8:
+                delta = shap_delta
+                method = "SHAP GradientExplainer"
         except Exception:
             pass
     indices = delta.argsort()[-5:][::-1]

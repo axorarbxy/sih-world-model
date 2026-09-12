@@ -9,6 +9,8 @@ def _exfiltration_risk(states, classifier):
     return float(np.clip(np.mean(values), 0, 1))
 
 def simulate_counterfactuals(history, world_model, classifier, action="block_port_445", k=5):
+    if action not in {"block_port_445", "rate_limit_syn"}:
+        raise ValueError(f"Unsupported mitigation action: {action}")
     future_a, _ = world_model.predict_next_k_states(history, k)
     intervened = history.copy()
     # Feature 13 is the normalized SMB/445 traffic count; neutralize it and SYN/RST pressure.

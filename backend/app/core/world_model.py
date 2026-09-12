@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch import nn
 
 class AttentionGRU(nn.Module):
@@ -21,10 +22,18 @@ class WorldModel:
         if weights_path and weights_path.exists():
             try: self.model.load_state_dict(torch.load(weights_path, map_location="cpu")); self.model.eval()
             except RuntimeError: pass  # Re-train after model architecture upgrades.
+        self.model.eval()
     @torch.no_grad()
     def predict_next_k_states(self, history, k=5):
-        states = list(history.copy()); futures = []; attention = []
+        history = np.asarray(history, dtype=np.float32)
+        if history.ndim != 2 or history.shape[1] != self.features:
+            raise ValueError(f"history must have shape (windows, {self.features})")
+        if len(history) == 0:
+            raise ValueError("history must contain at least one network state")
+        if k < 1:
+            raise ValueError("forecast steps must be positive")
+        states = [row.copy() for row in history]; futures = []; attention = []
         for _ in range(k):
-            x = torch.tensor(states[-8:], dtype=torch.float32).unsqueeze(0)
+            x = torch.from_numpy(np.asarray(states[-8:], dtype=np.float32)).unsqueeze(0)
             nxt, weights = self.model(x); value = nxt.squeeze(0).numpy(); futures.append(value); attention = weights.squeeze(0).tolist(); states.append(value)
         return futures, attention
