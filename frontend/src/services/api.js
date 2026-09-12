@@ -1,1 +1,1 @@
-import axios from 'axios'; export const uploadTraffic = file => { const form = new FormData(); form.append('file', file); return axios.post('http://localhost:8000/api/upload', form).then(r=>r.data) };
+import axios from 'axios'; const api=axios.create({baseURL:'http://localhost:8000/api'}); export const uploadTraffic = file => { const form = new FormData(); form.append('file', file); return api.post('/upload', form).then(r=>r.data) }; export const getHistory=()=>api.get('/history').then(r=>r.data);

@@ -28,7 +28,18 @@ def extract_csv(raw: bytes):
     else: groups = seconds.dt.floor("5s")
     work = pd.DataFrame({"bytes": col("tot len fwd pkts", "packet length", "flow bytes/s"), "packets": col("total forward packets", "total packets", "packets"), "syn": col("syn flag count"), "ack": col("ack flag count"), "rst": col("rst flag count"), "ttl": col("ttl"), "window": col("init_win_bytes_forward", "tcp window size"), "payload": col("payload size", "packet length"), "iat": col("flow iat mean", "iat"), "port": col("destination port", "dst port")})
     agg = work.groupby(groups).agg(packet_count=("packets", "count"), byte_count=("bytes", "sum"), flow_count=("packets", "count"), syn_count=("syn", "sum"), ack_count=("ack", "sum"), rst_count=("rst", "sum"), ttl_mean=("ttl", "mean"), ttl_variance=("ttl", "var"), window_mean=("window", "mean"), payload_mean=("payload", "mean"), payload_std=("payload", "std"), iat_mean=("iat", "mean"), iat_variance=("iat", "var"), port_445_count=("port", lambda x: (x == 445).sum()))
-    return _normalise(agg), list(map(str, agg.index))
+    src_col = next((lower[n] for n in ("source ip", "src ip", "sourceip") if n in lower), None)
+    dst_col = next((lower[n] for n in ("destination ip", "dst ip", "destinationip") if n in lower), None)
+    port_values = col("destination port", "dst port").astype(int)
+    if src_col and dst_col:
+        flows = pd.DataFrame({"source": df[src_col].astype(str), "target": df[dst_col].astype(str), "port": port_values})
+    else:
+        # CIC datasets without endpoint columns still show the service-level flow.
+        flows = pd.DataFrame({"source": ["Uploaded traffic"] * len(df), "target": [f"Service :{p}" for p in port_values], "port": port_values})
+    edges = flows.groupby(["source", "target", "port"]).size().reset_index(name="count").sort_values("count", ascending=False).head(20)
+    node_ids = list(dict.fromkeys(edges["source"].tolist() + edges["target"].tolist()))
+    network = {"nodes": [{"id": node, "suspicious": ":445" in node} for node in node_ids], "edges": [{"source": row.source, "target": row.target, "count": int(row.count), "suspicious": int(row.port) == 445} for row in edges.itertuples()]}
+    return _normalise(agg), list(map(str, agg.index)), network
 
 def extract_pcap(raw: bytes):
     from scapy.all import IP, TCP, rdpcap
@@ -37,10 +48,13 @@ def extract_pcap(raw: bytes):
     for p in packets:
         if IP not in p: continue
         tcp = p[TCP] if TCP in p else None; flags = int(tcp.flags) if tcp else 0
-        rows.append({"bucket": int(float(p.time)//5), "bytes": len(p), "syn": int(bool(flags & 2)), "ack": int(bool(flags & 16)), "rst": int(bool(flags & 4)), "ttl": p[IP].ttl, "window": tcp.window if tcp else 0, "payload": len(tcp.payload) if tcp else 0, "port445": int(bool(tcp and (tcp.sport == 445 or tcp.dport == 445)) )})
+        rows.append({"bucket": int(float(p.time)//5), "bytes": len(p), "syn": int(bool(flags & 2)), "ack": int(bool(flags & 16)), "rst": int(bool(flags & 4)), "ttl": p[IP].ttl, "window": tcp.window if tcp else 0, "payload": len(tcp.payload) if tcp else 0, "port445": int(bool(tcp and (tcp.sport == 445 or tcp.dport == 445))), "source": p[IP].src, "target": p[IP].dst, "port": tcp.dport if tcp else 0})
     if not rows: raise ValueError("No IP packets found in PCAP")
     df = pd.DataFrame(rows); agg = df.groupby("bucket").agg(packet_count=("bytes", "count"), byte_count=("bytes", "sum"), flow_count=("bytes", "count"), syn_count=("syn", "sum"), ack_count=("ack", "sum"), rst_count=("rst", "sum"), ttl_mean=("ttl", "mean"), ttl_variance=("ttl", "var"), window_mean=("window", "mean"), payload_mean=("payload", "mean"), payload_std=("payload", "std"), iat_mean=("bytes", "count"), iat_variance=("bytes", "var"), port_445_count=("port445", "sum"))
-    return _normalise(agg), [str(k * 5) for k in agg.index]
+    edge_data = df.groupby(["source", "target", "port"]).size().reset_index(name="count").sort_values("count", ascending=False).head(20)
+    node_ids = list(dict.fromkeys(edge_data["source"].tolist() + edge_data["target"].tolist()))
+    network = {"nodes": [{"id": node, "suspicious": False} for node in node_ids], "edges": [{"source": row.source, "target": row.target, "count": int(row.count), "suspicious": int(row.port) == 445} for row in edge_data.itertuples()]}
+    return _normalise(agg), [str(k * 5) for k in agg.index], network
 
 def extract_features(raw, filename):
     return extract_pcap(raw) if filename.lower().endswith((".pcap", ".pcapng")) else extract_csv(raw)

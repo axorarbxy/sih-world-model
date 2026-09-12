@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["predictions"])
 @router.post("/upload")
 async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
     try:
-        matrix, timestamps = extract_features(await file.read(), file.filename or "upload.csv")
+        matrix, timestamps, network = extract_features(await file.read(), file.filename or "upload.csv")
         if len(matrix) < 2: raise ValueError("Upload needs at least two traffic windows")
         wm = WorldModel(matrix.shape[1], MODEL_DIR / "world_model.pt"); clf = StageClassifier(MODEL_DIR / "xgboost_stage.json")
         history = matrix[-SEQUENCE_LENGTH:].copy(); futures, attention = wm.predict_next_k_states(history, FORECAST_STEPS)
@@ -26,5 +26,5 @@ async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
         genome, duplicate = anchor_genome(db, matrix[-1], timeline[-1]["predicted_stage"], timeline[-1]["infiltration_probability"])
         genome_status = reputation(db, matrix[-1]); genome_status.update({"anchored": not duplicate, "record_hash": genome.record_hash[:16]})
         record = Prediction(filename=file.filename or "upload", infiltration_probability=timeline[-1]["infiltration_probability"], predicted_stage=timeline[-1]["predicted_stage"], shap_values=explanation, digital_twin_result=twin); db.add(record); db.commit()
-        return {"timeline": timeline, "shap_values": explanation, "explanations": explanations, "digital_twin": twin, "threat_genome": genome_status, "network": {"nodes": [], "edges": []}}
+        return {"timeline": timeline, "shap_values": explanation, "explanations": explanations, "digital_twin": twin, "threat_genome": genome_status, "network": network}
     except Exception as exc: raise HTTPException(400, str(exc))
